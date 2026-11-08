@@ -64,7 +64,18 @@ jobs:
       - name: Build APK
         run: |
           cd "$PROJ"
-          gradle assembleDebug --stacktrace
+          set +e
+          gradle assembleDebug --console=plain > "$GITHUB_WORKSPACE/gradle.log" 2>&1
+          CODE=$?
+          set -e
+          if [ $CODE -ne 0 ]; then
+            echo "=================== FULL LOG (last 150 lines) ==================="
+            tail -n 150 "$GITHUB_WORKSPACE/gradle.log"
+            echo ""
+            echo "=================== ERROR SUMMARY (screenshot this) ==================="
+            grep -nE "^e: |error:|Error:|What went wrong|Execution failed|Could not|not found|Unresolved|> " "$GITHUB_WORKSPACE/gradle.log" | grep -v "^.*> Task" | head -n 40
+            exit 1
+          fi
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/SnakeProxy.apk"
 
       - name: Upload APK (artifact)
