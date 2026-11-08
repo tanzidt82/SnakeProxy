@@ -9,10 +9,10 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Find project (unzip SnakeProxy.zip if uploaded)
         run: |
@@ -29,12 +29,25 @@ jobs:
           fi
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Check Android SDK
+        id: sdk
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          if [ -n "$SDK" ] && [ -d "$SDK/platforms" ]; then
+            echo "Android SDK found: $SDK"
+            echo "sdk.dir=$SDK" > "$PROJ/local.properties"
+            echo "found=yes" >> $GITHUB_OUTPUT
+          else
+            echo "found=no" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Android SDK (only if missing)
+        if: steps.sdk.outputs.found != 'yes'
         uses: android-actions/setup-android@v3
 
       - name: Download proxy engine (hev-socks5-tunnel)
