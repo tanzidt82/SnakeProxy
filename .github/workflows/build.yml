@@ -1,0 +1,69 @@
+name: Build SnakeProxy APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find project (unzip SnakeProxy.zip if uploaded)
+        run: |
+          if [ -f SnakeProxy.zip ]; then
+            rm -rf build_src && mkdir build_src
+            unzip -q -o SnakeProxy.zip -d build_src
+          fi
+          if [ -f build_src/SnakeProxy/settings.gradle.kts ]; then
+            echo "PROJ=build_src/SnakeProxy" >> $GITHUB_ENV
+          elif [ -f SnakeProxy/settings.gradle.kts ]; then
+            echo "PROJ=SnakeProxy" >> $GITHUB_ENV
+          else
+            echo "PROJ=." >> $GITHUB_ENV
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Download proxy engine (hev-socks5-tunnel)
+        run: |
+          J="$PROJ/app/src/main/jni/hev-socks5-tunnel"
+          rm -rf "$J"
+          git clone --depth 1 --recursive --shallow-submodules https://github.com/heiher/hev-socks5-tunnel "$J"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        run: |
+          cd "$PROJ"
+          gradle assembleDebug --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/SnakeProxy.apk"
+
+      - name: Upload APK (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SnakeProxy-apk
+          path: SnakeProxy.apk
+
+      - name: Publish APK (Releases)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: SnakeProxy build ${{ github.run_number }}
+          files: SnakeProxy.apk
+          
